@@ -56,7 +56,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/haxelib
-          key: haxelib-psych042-${{ runner.os }}-v4
+          key: haxelib-psych042-${{ runner.os }}-v5
 
       - name: Install Haxe libraries
         working-directory: engine
@@ -74,10 +74,17 @@ jobs:
           haxelib install flixel-addons 2.10.0 --quiet
           haxelib install hscript --quiet
           haxelib install actuate --quiet
-          # Project.xml for this pinned Android base requires webview, but not extension-webm.
           haxelib git extension-webview https://github.com/HaxeExtension/extension-webview.git --quiet
-          haxelib git linc_luajit https://github.com/Daninnocent/linc_luajit.git --quiet
-          haxelib git hxvm-luajit https://github.com/nebulazorua/hxvm-luajit.git --quiet
+
+          # The old linc_luajit haxelib bootstrap asks Ubuntu for the removed
+          # libreadline6-dev package. Android uses the prebuilt ndll files in the
+          # repository, so register the legacy libraries directly instead.
+          mkdir -p .legacy-haxelibs
+          git clone --depth 1 https://github.com/Daninnocent/linc_luajit.git .legacy-haxelibs/linc_luajit
+          haxelib dev linc_luajit "$PWD/.legacy-haxelibs/linc_luajit"
+          git clone --depth 1 https://github.com/nebulazorua/hxvm-luajit.git .legacy-haxelibs/hxvm-luajit
+          haxelib dev hxvm-luajit "$PWD/.legacy-haxelibs/hxvm-luajit"
+
           haxelib run lime setup
           haxelib run lime config ANDROID_SDK "$ANDROID_SDK_ROOT"
           haxelib run lime config ANDROID_NDK_ROOT "$ANDROID_NDK_ROOT"
