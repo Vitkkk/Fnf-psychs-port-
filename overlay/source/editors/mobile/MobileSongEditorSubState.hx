@@ -9,13 +9,6 @@ import flixel.util.FlxColor;
 
 using StringTools;
 
-typedef MobileWeekSongEdit =
-{
-    var displayName:String;
-    var internalName:String;
-    var difficulties:Array<String>;
-}
-
 /** Touch-friendly song card editor used by MobileWeekEditorState. */
 class MobileSongEditorSubState extends FlxSubState
 {
