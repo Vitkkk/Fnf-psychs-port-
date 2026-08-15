@@ -26,6 +26,16 @@ jobs:
       - name: Apply mobile editor overlay
         run: python3 tools/apply_overlay.py engine
 
+      - name: Ensure legacy asset directories exist
+        shell: bash
+        run: |
+          set -euxo pipefail
+          # Lime 7.9 validates every <assets path="..."> entry in Project.xml
+          # before compiling. The pinned Kviks source references assets/videos,
+          # but that directory is absent from the Git checkout because Git does
+          # not track empty directories. Keep it available for the legacy build.
+          mkdir -p engine/assets/videos
+
       - name: Setup Haxe
         uses: krdlab/setup-haxe@v1
         with:
