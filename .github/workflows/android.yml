@@ -31,11 +31,11 @@ jobs:
         with:
           haxe-version: 4.2.3
 
-      - name: Setup Java 11
+      - name: Setup Java 17 for Android SDK tools
         uses: actions/setup-java@v4
         with:
           distribution: zulu
-          java-version: '11'
+          java-version: '17'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -46,11 +46,17 @@ jobs:
           ndk-version: r15c
           add-to-path: false
 
+      - name: Setup Java 11 for legacy Lime build
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '11'
+
       - name: Cache haxelib
         uses: actions/cache@v4
         with:
           path: ~/haxelib
-          key: haxelib-psych042-${{ runner.os }}-v2
+          key: haxelib-psych042-${{ runner.os }}-v3
 
       - name: Install Haxe libraries
         working-directory: engine
@@ -69,7 +75,7 @@ jobs:
           haxelib install hscript --quiet
           haxelib install actuate --quiet
           haxelib git extension-webview https://github.com/HaxeExtension/extension-webview.git --quiet || true
-          haxelib git extension-webm https://github.com/jigsaw-4277821/extension-webm --quiet
+          haxelib git extension-webm https://github.com/jigsaw-4277821/extension-webm.git --quiet
           haxelib git linc_luajit https://github.com/Daninnocent/linc_luajit.git --quiet
           haxelib git hxvm-luajit https://github.com/nebulazorua/hxvm-luajit.git --quiet || true
           haxelib run lime setup
