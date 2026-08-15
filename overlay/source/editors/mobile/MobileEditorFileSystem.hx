@@ -8,10 +8,7 @@ import sys.io.File;
 
 using StringTools;
 
-/**
- * Centralizes editor persistence so UI code never has to know Android paths.
- * The engine's existing Main.path remains the storage authority.
- */
+/** Centralized, mod-aware persistence for the Android editor layer. */
 class MobileEditorFileSystem
 {
     public static var currentMod(default, set):String = '';
@@ -24,10 +21,7 @@ class MobileEditorFileSystem
         return currentMod;
     }
 
-    public static function modsRoot():String
-    {
-        return Main.path + 'mods/';
-    }
+    public static function modsRoot():String return Main.path + 'mods/';
 
     public static function currentModRoot():String
     {
@@ -61,21 +55,42 @@ class MobileEditorFileSystem
             if (FileSystem.isDirectory(full) && !entry.startsWith('.')) out.push(entry);
         }
         #end
-        out.sort(function(a:String, b:String):Int return Reflect.compare(a.toLowerCase(), b.toLowerCase()));
+        out.sort(sortNames);
         return out;
     }
 
     public static function listWeekFiles():Array<String>
     {
+        var seen:Map<String, Bool> = new Map();
         var out:Array<String> = [];
         #if sys
-        var dir = currentModRoot() + 'weeks/';
-        ensureDir(dir);
-        for (entry in FileSystem.readDirectory(dir))
-            if (entry.toLowerCase().endsWith('.json')) out.push(entry.substr(0, entry.length - 5));
+        var modDir = currentModRoot() + 'weeks/';
+        ensureDir(modDir);
+        scanJsonNames(modDir, seen, out);
+        scanJsonNames('assets/weeks/', seen, out);
         #end
-        out.sort(function(a:String, b:String):Int return Reflect.compare(a.toLowerCase(), b.toLowerCase()));
+        out.sort(sortNames);
         return out;
+    }
+
+    public static function ensureWeekListed(id:String):Void
+    {
+        #if sys
+        ensureProject();
+        var safe = sanitizeId(id);
+        var path = currentModRoot() + 'weeks/weekList.txt';
+        var lines:Array<String> = [];
+        if (FileSystem.exists(path))
+        {
+            for (line in File.getContent(path).replace('\r', '').split('\n'))
+            {
+                var clean = line.trim();
+                if (clean.length > 0 && lines.indexOf(clean) == -1) lines.push(clean);
+            }
+        }
+        if (lines.indexOf(safe) == -1) lines.push(safe);
+        safeWriteText(path, lines.join('\n') + '\n');
+        #end
     }
 
     public static function listCharacters():Array<String>
@@ -83,20 +98,10 @@ class MobileEditorFileSystem
         var seen:Map<String, Bool> = new Map();
         var out:Array<String> = [];
         #if sys
-        var modDir = currentModRoot() + 'characters/';
-        if (FileSystem.exists(modDir))
-        {
-            for (entry in FileSystem.readDirectory(modDir))
-                if (entry.toLowerCase().endsWith('.json')) addUnique(entry.substr(0, entry.length - 5), seen, out);
-        }
-        var baseDir = 'assets/characters/';
-        if (FileSystem.exists(baseDir))
-        {
-            for (entry in FileSystem.readDirectory(baseDir))
-                if (entry.toLowerCase().endsWith('.json')) addUnique(entry.substr(0, entry.length - 5), seen, out);
-        }
+        scanJsonNames(currentModRoot() + 'characters/', seen, out);
+        scanJsonNames('assets/characters/', seen, out);
         #end
-        out.sort(function(a:String, b:String):Int return Reflect.compare(a.toLowerCase(), b.toLowerCase()));
+        out.sort(sortNames);
         return out;
     }
 
@@ -108,14 +113,11 @@ class MobileEditorFileSystem
         scanExtensions(currentModRoot() + 'fonts/', ['ttf', 'otf'], seen, out);
         scanExtensions('assets/fonts/', ['ttf', 'otf'], seen, out);
         #end
-        out.sort(function(a:String, b:String):Int return Reflect.compare(a.toLowerCase(), b.toLowerCase()));
+        out.sort(sortNames);
         return out;
     }
 
-    public static function weekPath(id:String):String
-    {
-        return currentModRoot() + 'weeks/' + sanitizeId(id) + '.json';
-    }
+    public static function weekPath(id:String):String return currentModRoot() + 'weeks/' + sanitizeId(id) + '.json';
 
     public static function songPath(song:String, ?difficulty:String = ''):String
     {
@@ -134,8 +136,7 @@ class MobileEditorFileSystem
         #if sys
         try
         {
-            var parsed:Dynamic = Json.parse(json);
-            if (parsed == null) return false;
+            if (Json.parse(json) == null) return false;
             ensureDir(parent(path));
             var tmp = path + '.tmp';
             var backup = path + '.bak';
@@ -160,14 +161,34 @@ class MobileEditorFileSystem
         #end
     }
 
+    public static function safeWriteText(path:String, text:String):Bool
+    {
+        #if sys
+        try
+        {
+            ensureDir(parent(path));
+            var tmp = path + '.tmp';
+            File.saveContent(tmp, text);
+            if (FileSystem.exists(path)) FileSystem.deleteFile(path);
+            FileSystem.rename(tmp, path);
+            return true;
+        }
+        catch (e:Dynamic)
+        {
+            trace('MobileEditorFileSystem.safeWriteText failed: ' + Std.string(e));
+            return false;
+        }
+        #else
+        return false;
+        #end
+    }
+
     public static function saveAutosave(kind:String, id:String, json:String):Bool
     {
         if (!autosaveEnabled) return false;
         #if sys
         ensureProject();
-        var safeKind = sanitizeId(kind);
-        var safeId = sanitizeId(id);
-        var path = currentModRoot() + '.editor/autosaves/' + safeKind + '-' + safeId + '.json';
+        var path = currentModRoot() + '.editor/autosaves/' + sanitizeId(kind) + '-' + sanitizeId(id) + '.json';
         return safeWriteJson(path, json);
         #else
         return false;
@@ -192,13 +213,12 @@ class MobileEditorFileSystem
             File.copy(source, target);
             return target;
         }
-        catch (e:Dynamic)
-        {
-            trace('copyIntoCurrentMod failed: ' + Std.string(e));
-        }
+        catch (e:Dynamic) trace('copyIntoCurrentMod failed: ' + Std.string(e));
         #end
         return null;
     }
+
+    static function sortNames(a:String, b:String):Int return Reflect.compare(a.toLowerCase(), b.toLowerCase());
 
     static function addUnique(value:String, seen:Map<String, Bool>, out:Array<String>):Void
     {
@@ -211,6 +231,13 @@ class MobileEditorFileSystem
     }
 
     #if sys
+    static function scanJsonNames(dir:String, seen:Map<String, Bool>, out:Array<String>):Void
+    {
+        if (!FileSystem.exists(dir)) return;
+        for (entry in FileSystem.readDirectory(dir))
+            if (entry.toLowerCase().endsWith('.json')) addUnique(entry.substr(0, entry.length - 5), seen, out);
+    }
+
     static function scanExtensions(dir:String, exts:Array<String>, seen:Map<String, Bool>, out:Array<String>):Void
     {
         if (!FileSystem.exists(dir)) return;
@@ -251,7 +278,6 @@ class MobileEditorFileSystem
         var out = value.trim().toLowerCase();
         out = out.replace(' ', '-').replace('/', '-').replace('\\', '-').replace('..', '-');
         while (out.indexOf('--') != -1) out = out.replace('--', '-');
-        if (out.length == 0) out = 'untitled';
-        return out;
+        return out.length == 0 ? 'untitled' : out;
     }
 }
