@@ -2,4 +2,4 @@
 
 Touch this file only when a workflow-definition change needs a fresh push build.
 
-Trigger: dependency cleanup v4.
+Trigger: legacy LuaJIT dev registration v5.
