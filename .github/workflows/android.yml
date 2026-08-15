@@ -26,6 +26,12 @@ jobs:
       - name: Apply mobile editor overlay
         run: python3 tools/apply_overlay.py engine
 
+      - name: Apply legacy API compatibility fixes
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i 's/new FlxUIInputText(x, y, width, value, 21)/new FlxUIInputText(x, y, Std.int(width), value, 21)/' engine/source/editors/mobile/MobileChartBridge.hx
+
       - name: Ensure legacy asset directories exist
         shell: bash
         run: |
